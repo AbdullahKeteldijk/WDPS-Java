@@ -54,7 +54,7 @@ public class SparkScript {
 		hadoopConf.set("textinputformat.record.delimiter", "WARC/1.0");
 
 		JavaPairRDD<String, PortableDataStream> compressedFilesRDD = context
-				.binaryFiles("/home/kevin/Documents/WDPS/wdps2017/*.gz");
+				.binaryFiles("hdfs:///user/bbkruit/CommonCrawl-sample.warc.gz");
 
 		JavaRDD<CustomWarcRecord> fileContentRDD = compressedFilesRDD.flatMap(fileNameContent -> {
 			PortableDataStream content = fileNameContent._2();
