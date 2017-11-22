@@ -134,6 +134,13 @@ public class SparkScript {
 			List<CoreMap> coreMapSentences = documentSentences.get(SentencesAnnotation.class);
 			ArrayList<Token> tokensList = new ArrayList<Token>();
 			for (CoreMap sentence : coreMapSentences) {
+				edu.stanford.nlp.simple.Sentence countTokensSentence = new edu.stanford.nlp.simple.Sentence(
+						sentence);
+				// IF SENTENCE HAS MORE THAN 100 TOKENS, DO NOT PROCESS IT!
+				if (countTokensSentence.length() > 100) {
+					logger.info("Sentence out");
+					continue;
+				}				
 				// Get the tokens
 				List<CoreLabel> tokens = sentence.get(TokensAnnotation.class);
 				for (CoreLabel t : tokens) {
