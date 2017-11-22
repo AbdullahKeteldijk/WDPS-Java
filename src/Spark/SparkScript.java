@@ -74,7 +74,7 @@ public class SparkScript {
 					public String call(Text arg0) throws Exception {
 						return ("WARC/1.0" + arg0.toString()).trim();
 					}
-				}).repartition(50);
+				}).repartition(100);
 
 		/// home/kevin/Documents/WDPS/wdps2017/CommonCrawl-sample.warc.gz
 		// hdfs:///user/bbkruit/CC-MAIN-20160924173739-00000-ip-10-143-35-109.ec2.internal.warc.gz
@@ -124,10 +124,12 @@ public class SparkScript {
 
 		JavaRDD<AnnotatedRecord> annotatedRDD = fileContentRDD.map(record -> {
 			String recordID = record.getRecordID();
+			logger.info("Processing: "+recordID);
 			String parsedContent = Jsoup.parse(record.getContent()).text();
+			StanfordCoreNLP localPipeline = SparkScript.pipeline; 
 
 			Annotation documentSentences = new Annotation(parsedContent);
-			pipeline.annotate(documentSentences);
+			localPipeline.annotate(documentSentences);
 
 			List<CoreMap> coreMapSentences = documentSentences.get(SentencesAnnotation.class);
 			ArrayList<Token> tokensList = new ArrayList<Token>();
