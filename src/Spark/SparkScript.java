@@ -59,16 +59,23 @@ public class SparkScript {
 			conf = new SparkConf().setAppName("Extraction").setMaster("local[3]");// .setJars(jars);
 		else
 			conf = new SparkConf().setAppName("Extraction");
+		
 		context = new JavaSparkContext(conf);
 
 		Configuration hadoopConf = new Configuration();
 		hadoopConf.set("textinputformat.record.delimiter", "WARC/1.0");
-		JavaRDD<CustomWarcRecord> rddWARC = context
-				.newAPIHadoopFile(inputdir, TextInputFormat.class, LongWritable.class, Text.class, hadoopConf).values()
+		JavaRDD<String> rdd = context
+				.newAPIHadoopFile(inputdir, TextInputFormat.class, LongWritable.class, Text.class, hadoopConf).values().map(f->{
+					String text = ("WARC/1.0" + f.toString()).trim();
+					return text;
+				}).repartition(100);
+		
+		
+		JavaRDD<CustomWarcRecord> rddWARC = rdd
 				.mapPartitions(f -> {
 					ArrayList<CustomWarcRecord> outputList = new ArrayList<CustomWarcRecord>();
 					while (f.hasNext()) {
-						String text = ("WARC/1.0" + f.next().toString()).trim();
+						String text = ("WARC/1.0" + f.next()).trim();
 						InputStream is = new ByteArrayInputStream(text.getBytes(StandardCharsets.UTF_8.name()));
 
 						int numRecords = 0;
@@ -104,21 +111,41 @@ public class SparkScript {
 						is.close();
 					}
 					return outputList.iterator();
-				}).repartition(10);
+				}).repartition(24);
 
 		/// home/kevin/Documents/WDPS/wdps2017/CommonCrawl-sample.warc.gz
 		// hdfs:///user/bbkruit/CC-MAIN-20160924173739-00000-ip-10-143-35-109.ec2.internal.warc.gz
 
 		JavaRDD<AnnotatedRecord> annotatedRDD = rddWARC.mapPartitions(recordList -> {
 			ArrayList<AnnotatedRecord> output = new ArrayList<AnnotatedRecord>();
-			StanfordCoreNLP localPipeline = SparkScript.StanfordDepNNParser();
+			Properties props = new Properties();
+
+			props.put("language", "english");
+			props.setProperty("annotators", "tokenize, ssplit, pos, lemma, ner");
+			props.put("depparse.model", "edu/stanford/nlp/models/parser/nndep/english_SD.gz");
+			props.put("parse.originalDependencies", true);
+			props.setProperty("ner.useSUTime", "false");
+			props.setProperty("ner.applyNumericClassifiers", "false");
+			props.setProperty("coref.algorithm", "statistical");
+			props.setProperty("coref.maxMentionDistance", "30"); // default = 50
+			props.setProperty("coref.maxMentionDistanceWithStringMatch", "250"); // default = 500
+			// Probably not needed, since we don't train a new model.
+			// But if, for some reason, a new model is trained this will reduce the memory
+			// load in the training
+			props.setProperty("coref.statistical.maxTrainExamplesPerDocument", "1100"); // Use this to downsample examples
+																						// from larger documents. A value
+																						// larger than 1000 is recommended.
+			props.setProperty("coref.statistical.minClassImbalance", "0.04"); // A value less than 0.05 is recommended.
+
+			StanfordCoreNLP pipeline = new StanfordCoreNLP(props);
+			
 			while (recordList.hasNext()) {
 				CustomWarcRecord record = recordList.next();
 				String recordID = record.getRecordID();
 				String parsedContent = Jsoup.parse(record.getContent()).text();
 
 				Annotation documentSentences = new Annotation(parsedContent);
-				localPipeline.annotate(documentSentences);
+				pipeline.annotate(documentSentences);
 
 				List<CoreMap> coreMapSentences = documentSentences.get(SentencesAnnotation.class);
 				ArrayList<Token> tokensList = new ArrayList<Token>();
