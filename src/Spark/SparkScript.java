@@ -8,7 +8,8 @@ import java.util.Properties;
 import java.util.zip.GZIPInputStream;
 
 import org.apache.hadoop.conf.Configuration;
-
+import org.apache.log4j.LogManager;
+import org.apache.log4j.Logger;
 import org.apache.spark.SparkConf;
 import org.apache.spark.api.java.JavaPairRDD;
 import org.apache.spark.api.java.JavaRDD;
@@ -17,10 +18,7 @@ import org.apache.spark.input.PortableDataStream;
 import org.jsoup.Jsoup;
 import org.jwat.warc.WarcReader;
 import org.jwat.warc.WarcReaderFactory;
-import org.jwat.warc.WarcReaderUncompressed;
 import org.jwat.warc.WarcRecord;
-import org.apache.log4j.LogManager;
-import org.apache.log4j.Logger;
 
 import edu.stanford.nlp.ling.CoreAnnotations.SentencesAnnotation;
 import edu.stanford.nlp.ling.CoreAnnotations.TokensAnnotation;
@@ -28,8 +26,6 @@ import edu.stanford.nlp.ling.CoreLabel;
 import edu.stanford.nlp.pipeline.Annotation;
 import edu.stanford.nlp.pipeline.StanfordCoreNLP;
 import edu.stanford.nlp.util.CoreMap;
-
-import org.apache.commons.io.IOUtils;
 
 
 public class SparkScript {
@@ -56,9 +52,9 @@ public class SparkScript {
 		// pipe character | is the record seperator
 		hadoopConf.set("textinputformat.record.delimiter", "WARC/1.0");
 		///home/kevin/Documents/WDPS/wdps2017/CommonCrawl-sample.warc.gz
-		//hdfs:///user/bbkruit/CommonCrawl-sample.warc.gz
+		//hdfs:///user/bbkruit/CC-MAIN-20160924173739-00000-ip-10-143-35-109.ec2.internal.warc.gz
 		JavaPairRDD<String, PortableDataStream> compressedFilesRDD = context
-				.binaryFiles("hdfs:///user/bbkruit/CommonCrawl-sample.warc.gz");
+				.binaryFiles("hdfs:///user/bbkruit/CC-MAIN-20160924173739-00000-ip-10-143-35-109.ec2.internal.warc.gz");
 
 		
 		JavaRDD<CustomWarcRecord> fileContentRDD = compressedFilesRDD.flatMap(fileNameContent -> {
