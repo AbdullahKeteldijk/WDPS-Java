@@ -8,7 +8,6 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
-import java.util.zip.GZIPInputStream;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.LongWritable;
@@ -17,11 +16,9 @@ import org.apache.hadoop.mapreduce.lib.input.TextInputFormat;
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
 import org.apache.spark.SparkConf;
-import org.apache.spark.api.java.JavaPairRDD;
 import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.JavaSparkContext;
 import org.apache.spark.api.java.function.Function;
-import org.apache.spark.input.PortableDataStream;
 import org.jsoup.Jsoup;
 import org.jwat.warc.WarcReader;
 import org.jwat.warc.WarcReaderFactory;
@@ -77,7 +74,7 @@ public class SparkScript {
 					public String call(Text arg0) throws Exception {
 						return ("WARC/1.0" + arg0.toString()).trim();
 					}
-				});
+				}).repartition(50);
 
 		/// home/kevin/Documents/WDPS/wdps2017/CommonCrawl-sample.warc.gz
 		// hdfs:///user/bbkruit/CC-MAIN-20160924173739-00000-ip-10-143-35-109.ec2.internal.warc.gz
@@ -123,7 +120,7 @@ public class SparkScript {
 
 			return outputList.iterator();
 		});
-		fileContentRDD = fileContentRDD.repartition(50);
+		
 
 		JavaRDD<AnnotatedRecord> annotatedRDD = fileContentRDD.map(record -> {
 			String recordID = record.getRecordID();
