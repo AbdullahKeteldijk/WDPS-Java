@@ -33,7 +33,7 @@ import org.apache.commons.io.IOUtils;
 
 
 public class SparkScript {
-	public static final StanfordCoreNLP pipeline = sd.StanfordDepNNParser();
+	public static final StanfordCoreNLP pipeline = SparkScript.StanfordDepNNParser();
 	private static JavaSparkContext context;
 	private static final Logger logger = LogManager.getLogger("Extraction Logger");
 
