@@ -63,61 +63,53 @@ public class SparkScript {
 
 		Configuration hadoopConf = new Configuration();
 		hadoopConf.set("textinputformat.record.delimiter", "WARC/1.0");
-		JavaRDD<String> rddWARC = context
+		JavaRDD<CustomWarcRecord> rddWARC = context
 				.newAPIHadoopFile(inputdir, TextInputFormat.class, LongWritable.class, Text.class, hadoopConf).values()
-				.map(new Function<Text, String>() {
-					@Override
-					public String call(Text arg0) throws Exception {
-						return ("WARC/1.0" + arg0.toString()).trim();
+				.mapPartitions(f -> {
+					ArrayList<CustomWarcRecord> outputList = new ArrayList<CustomWarcRecord>();
+					while (f.hasNext()) {
+						String text = ("WARC/1.0" + f.next().toString()).trim();
+						InputStream is = new ByteArrayInputStream(text.getBytes(StandardCharsets.UTF_8.name()));
+
+						int numRecords = 0;
+						int errors = 0;
+						WarcReader reader = WarcReaderFactory.getReader(is);
+						WarcRecord record;
+						while ((record = reader.getNextRecord()) != null) {
+							if ((++numRecords) % 1000 == 0)
+								System.out.println(numRecords);
+							if (record.getHeader("WARC-Record-ID") == null)
+								continue;
+							String recordId = record.getHeader("WARC-Record-ID").value;
+							String contentType = record.getHeader("Content-Type").value;
+
+							if (!contentType.equals("application/http; msgtype=response"))
+								continue;
+							BufferedReader br = null;
+							StringBuilder sb = new StringBuilder();
+
+							String line;
+							try {
+								br = new BufferedReader(new InputStreamReader(record.getPayload().getInputStream()));
+								while ((line = br.readLine()) != null) {
+									sb.append(line);
+								}
+								CustomWarcRecord temp = new CustomWarcRecord(recordId, sb.toString());
+								outputList.add(temp);
+							} catch (Exception e) {
+								e.printStackTrace();
+							}
+						}
+						reader.close();
+						is.close();
 					}
+					return outputList.iterator();
 				}).repartition(10);
 
 		/// home/kevin/Documents/WDPS/wdps2017/CommonCrawl-sample.warc.gz
 		// hdfs:///user/bbkruit/CC-MAIN-20160924173739-00000-ip-10-143-35-109.ec2.internal.warc.gz
 
-		JavaRDD<CustomWarcRecord> fileContentRDD = rddWARC.flatMap(fileNameContent -> {
-
-			InputStream is = new ByteArrayInputStream(fileNameContent.getBytes(StandardCharsets.UTF_8.name()));
-			ArrayList<CustomWarcRecord> outputList = new ArrayList<CustomWarcRecord>();
-			if (fileNameContent.equals("WARC/1.0"))
-				return outputList.iterator();
-
-			int numRecords = 0;
-			int errors = 0;
-			WarcReader reader = WarcReaderFactory.getReader(is);
-			WarcRecord record;
-			while ((record = reader.getNextRecord()) != null) {
-				if ((++numRecords) % 1000 == 0)
-					System.out.println(numRecords);
-				String recordId = record.getHeader("WARC-Record-ID").value;
-				String contentType = record.getHeader("Content-Type").value;
-
-				if (!contentType.equals("application/http; msgtype=response"))
-					continue;
-				BufferedReader br = null;
-				StringBuilder sb = new StringBuilder();
-
-				String line;
-				try {
-					br = new BufferedReader(new InputStreamReader(record.getPayload().getInputStream()));
-					while ((line = br.readLine()) != null) {
-						sb.append(line);
-					}
-					CustomWarcRecord temp = new CustomWarcRecord(recordId, sb.toString());
-					outputList.add(temp);
-				} catch (Exception e) {
-					e.printStackTrace();
-
-				}
-			}
-
-			reader.close();
-			is.close();
-
-			return outputList.iterator();
-		});
-
-		JavaRDD<AnnotatedRecord> annotatedRDD = fileContentRDD.mapPartitions(recordList -> {
+		JavaRDD<AnnotatedRecord> annotatedRDD = rddWARC.mapPartitions(recordList -> {
 			ArrayList<AnnotatedRecord> output = new ArrayList<AnnotatedRecord>();
 			StanfordCoreNLP localPipeline = SparkScript.StanfordDepNNParser();
 			while (recordList.hasNext()) {
