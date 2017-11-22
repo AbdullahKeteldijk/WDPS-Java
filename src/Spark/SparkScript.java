@@ -168,6 +168,7 @@ public class SparkScript {
 		props.put("depparse.model", "edu/stanford/nlp/models/parser/nndep/english_SD.gz");
 		props.put("parse.originalDependencies", true);
 		props.setProperty("ner.useSUTime", "false");
+		props.setProperty("ner.applyNumericClassifiers", "false");
 		props.setProperty("coref.algorithm", "statistical");
 		props.setProperty("coref.maxMentionDistance", "30"); // default = 50
 		props.setProperty("coref.maxMentionDistanceWithStringMatch", "250"); // default = 500
