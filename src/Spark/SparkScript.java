@@ -32,7 +32,6 @@ import edu.stanford.nlp.pipeline.StanfordCoreNLP;
 import edu.stanford.nlp.util.CoreMap;
 
 public class SparkScript {
-	public static final StanfordCoreNLP pipeline = SparkScript.StanfordDepNNParser();
 	private static JavaSparkContext context;
 	private static final Logger logger = LogManager.getLogger("Extraction Logger");
 
@@ -49,11 +48,9 @@ public class SparkScript {
 		if (inputdir == null)
 			inputdir = "/home/kevin/Documents/WDPS/wdps2017/CommonCrawl-sample.warc.gz";
 		useLocalMode = useLocalMode.toLowerCase();
-		
+
 		System.out.println(inputdir);
 		System.out.println(useLocalMode);
-		
-		
 
 		// Depending on the input params, set the spark context to either local or
 		// cluster mode.
@@ -67,14 +64,13 @@ public class SparkScript {
 		Configuration hadoopConf = new Configuration();
 		hadoopConf.set("textinputformat.record.delimiter", "WARC/1.0");
 		JavaRDD<String> rddWARC = context
-				.newAPIHadoopFile(inputdir,
-						TextInputFormat.class, LongWritable.class, Text.class, hadoopConf)
-				.values().map(new Function<Text, String>() {
+				.newAPIHadoopFile(inputdir, TextInputFormat.class, LongWritable.class, Text.class, hadoopConf).values()
+				.map(new Function<Text, String>() {
 					@Override
 					public String call(Text arg0) throws Exception {
 						return ("WARC/1.0" + arg0.toString()).trim();
 					}
-				}).repartition(100);
+				}).repartition(10);
 
 		/// home/kevin/Documents/WDPS/wdps2017/CommonCrawl-sample.warc.gz
 		// hdfs:///user/bbkruit/CC-MAIN-20160924173739-00000-ip-10-143-35-109.ec2.internal.warc.gz
@@ -120,39 +116,42 @@ public class SparkScript {
 
 			return outputList.iterator();
 		});
-		
 
-		JavaRDD<AnnotatedRecord> annotatedRDD = fileContentRDD.map(record -> {
-			String recordID = record.getRecordID();
-			logger.info("Processing: "+recordID);
-			String parsedContent = Jsoup.parse(record.getContent()).text();
-			StanfordCoreNLP localPipeline = SparkScript.pipeline; 
+		JavaRDD<AnnotatedRecord> annotatedRDD = fileContentRDD.mapPartitions(recordList -> {
+			ArrayList<AnnotatedRecord> output = new ArrayList<AnnotatedRecord>();
+			StanfordCoreNLP localPipeline = SparkScript.StanfordDepNNParser();
+			while (recordList.hasNext()) {
+				CustomWarcRecord record = recordList.next();
+				String recordID = record.getRecordID();
+				String parsedContent = Jsoup.parse(record.getContent()).text();
 
-			Annotation documentSentences = new Annotation(parsedContent);
-			localPipeline.annotate(documentSentences);
+				Annotation documentSentences = new Annotation(parsedContent);
+				localPipeline.annotate(documentSentences);
 
-			List<CoreMap> coreMapSentences = documentSentences.get(SentencesAnnotation.class);
-			ArrayList<Token> tokensList = new ArrayList<Token>();
-			for (CoreMap sentence : coreMapSentences) {
-				edu.stanford.nlp.simple.Sentence countTokensSentence = new edu.stanford.nlp.simple.Sentence(
-						sentence);
-				// IF SENTENCE HAS MORE THAN 100 TOKENS, DO NOT PROCESS IT!
-				if (countTokensSentence.length() > 100) {
-					logger.info("Sentence out");
-					continue;
-				}				
-				// Get the tokens
-				List<CoreLabel> tokens = sentence.get(TokensAnnotation.class);
-				for (CoreLabel t : tokens) {
-					if (!t.ner().equals("O") && !t.ner().equals("TIME") && !t.ner().equals("DATE")
-							&& !t.ner().equals("NUMBER")) {
-						Token tempToken = new Token(t.originalText(), t.ner(), t.lemma());
-						tokensList.add(tempToken);
+				List<CoreMap> coreMapSentences = documentSentences.get(SentencesAnnotation.class);
+				ArrayList<Token> tokensList = new ArrayList<Token>();
+				for (CoreMap sentence : coreMapSentences) {
+					edu.stanford.nlp.simple.Sentence countTokensSentence = new edu.stanford.nlp.simple.Sentence(
+							sentence);
+					// IF SENTENCE HAS MORE THAN 100 TOKENS, DO NOT PROCESS IT!
+					if (countTokensSentence.length() > 100) {
+						logger.info("Sentence out");
+						continue;
+					}
+					// Get the tokens
+					List<CoreLabel> tokens = sentence.get(TokensAnnotation.class);
+					for (CoreLabel t : tokens) {
+						if (!t.ner().equals("O") && !t.ner().equals("TIME") && !t.ner().equals("DATE")
+								&& !t.ner().equals("NUMBER")) {
+							Token tempToken = new Token(t.originalText(), t.ner(), t.lemma());
+							tokensList.add(tempToken);
+						}
 					}
 				}
+				AnnotatedRecord anRecord = new AnnotatedRecord(recordID, tokensList);
+				output.add(anRecord);
 			}
-			AnnotatedRecord output = new AnnotatedRecord(recordID, tokensList);
-			return output;
+			return output.iterator();
 		});
 
 		JavaRDD<String> outputRDD = annotatedRDD.flatMap(record -> {
