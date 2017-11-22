@@ -51,8 +51,12 @@ public class SparkScript {
 			useLocalMode = "true";
 		if (inputdir == null)
 			inputdir = "/home/kevin/Documents/WDPS/wdps2017/CommonCrawl-sample.warc.gz";
-
 		useLocalMode = useLocalMode.toLowerCase();
+		
+		System.out.println(inputdir);
+		System.out.println(useLocalMode);
+		
+		
 
 		// Depending on the input params, set the spark context to either local or
 		// cluster mode.
@@ -66,7 +70,7 @@ public class SparkScript {
 		Configuration hadoopConf = new Configuration();
 		hadoopConf.set("textinputformat.record.delimiter", "WARC/1.0");
 		JavaRDD<String> rddWARC = context
-				.newAPIHadoopFile("/home/kevin/Documents/WDPS/wdps2017/CommonCrawl-sample.warc.gz",
+				.newAPIHadoopFile(inputdir,
 						TextInputFormat.class, LongWritable.class, Text.class, hadoopConf)
 				.values().map(new Function<Text, String>() {
 					@Override
