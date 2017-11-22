@@ -1,3 +1,4 @@
+package Spark;
 import java.io.Serializable;
 
 public class CustomWarcRecord implements Serializable {
