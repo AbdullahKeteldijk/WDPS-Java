@@ -4,11 +4,11 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Properties;
 import java.util.zip.GZIPInputStream;
 
 import org.apache.hadoop.conf.Configuration;
-import org.apache.log4j.LogManager;
-import org.apache.log4j.Logger;
+
 import org.apache.spark.SparkConf;
 import org.apache.spark.api.java.JavaPairRDD;
 import org.apache.spark.api.java.JavaRDD;
@@ -17,7 +17,10 @@ import org.apache.spark.input.PortableDataStream;
 import org.jsoup.Jsoup;
 import org.jwat.warc.WarcReader;
 import org.jwat.warc.WarcReaderFactory;
+import org.jwat.warc.WarcReaderUncompressed;
 import org.jwat.warc.WarcRecord;
+import org.apache.log4j.LogManager;
+import org.apache.log4j.Logger;
 
 import edu.stanford.nlp.ling.CoreAnnotations.SentencesAnnotation;
 import edu.stanford.nlp.ling.CoreAnnotations.TokensAnnotation;
@@ -25,6 +28,8 @@ import edu.stanford.nlp.ling.CoreLabel;
 import edu.stanford.nlp.pipeline.Annotation;
 import edu.stanford.nlp.pipeline.StanfordCoreNLP;
 import edu.stanford.nlp.util.CoreMap;
+
+import org.apache.commons.io.IOUtils;
 
 
 public class SparkScript {
@@ -130,5 +135,25 @@ public class SparkScript {
 		System.out.println(outputRDD.collect());
 
 	}
+	public static StanfordCoreNLP StanfordDepNNParser(){
+        Properties props = new Properties();
+
+        props.put("language", "english");
+        props.setProperty("annotators", "tokenize, ssplit, pos, lemma, ner");
+        props.put("depparse.model", "edu/stanford/nlp/models/parser/nndep/english_SD.gz");
+        props.put("parse.originalDependencies", true);
+        props.setProperty("ner.useSUTime", "false");
+        props.setProperty("coref.algorithm", "statistical");
+        props.setProperty("coref.maxMentionDistance", "30"); //default = 50
+        props.setProperty("coref.maxMentionDistanceWithStringMatch", "250"); //default = 500
+        //Probably not needed, since we don't train a new model.
+        //But if, for some reason, a new model is trained this will reduce the memory load in the training
+        props.setProperty("coref.statistical.maxTrainExamplesPerDocument", "1100"); //Use this to downsample examples from larger documents. A value larger than 1000 is recommended.
+        props.setProperty("coref.statistical.minClassImbalance", "0.04"); //A value less than 0.05 is recommended.
+        
+
+        StanfordCoreNLP pipeline =  new StanfordCoreNLP(props);
+        return pipeline;
+    }
 
 }
