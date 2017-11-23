@@ -68,7 +68,7 @@ public class SparkScript {
 				.newAPIHadoopFile(inputdir, TextInputFormat.class, LongWritable.class, Text.class, hadoopConf).values().map(f->{
 					String text = ("WARC/1.0" + f.toString()).trim();
 					return text;
-				}).repartition(50);
+				}).repartition(500);
 		
 		
 		JavaRDD<CustomWarcRecord> rddWARC = rdd
@@ -106,6 +106,7 @@ public class SparkScript {
 							} catch (Exception e) {
 								e.printStackTrace();
 							}
+							
 						}
 						reader.close();
 						is.close();
@@ -142,18 +143,23 @@ public class SparkScript {
 			while (recordList.hasNext()) {
 				CustomWarcRecord record = recordList.next();
 				String recordID = record.getRecordID();
+				
 				String parsedContent = Jsoup.parse(record.getContent()).text();
-
+				System.out.println(parsedContent);
+				System.out.println(record.getContent());
+				
 				Annotation documentSentences = new Annotation(parsedContent);
 				pipeline.annotate(documentSentences);
-
+				System.out.println(recordID);
 				List<CoreMap> coreMapSentences = documentSentences.get(SentencesAnnotation.class);
 				ArrayList<Token> tokensList = new ArrayList<Token>();
 				for (CoreMap sentence : coreMapSentences) {
+					
 					edu.stanford.nlp.simple.Sentence countTokensSentence = new edu.stanford.nlp.simple.Sentence(
 							sentence);
 					// IF SENTENCE HAS MORE THAN 100 TOKENS, DO NOT PROCESS IT!
-					if (countTokensSentence.length() > 50) {
+					System.out.println(countTokensSentence.length());
+					if (countTokensSentence.length() > 200) {
 						logger.info("Sentence out");
 						continue;
 					}
@@ -181,8 +187,6 @@ public class SparkScript {
 			return output.iterator();
 		});
 
-		outputRDD.cache();
-		System.out.println(outputRDD.count());
 		System.out.println(outputRDD.collect());
 
 	}
