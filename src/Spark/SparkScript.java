@@ -81,14 +81,12 @@ public class SparkScript {
 			propsSentence.setProperty("annotators", "tokenize, ssplit");
 			StanfordCoreNLP pipelineSentence = new StanfordCoreNLP(propsSentence);
 
-			/*
-			 * Properties props = new Properties();
-			 * 
-			 * props.put("language", "english"); props.setProperty("annotators",
-			 * "tokenize, ssplit, pos, lemma, ner"); props.setProperty("ner.useSUTime",
-			 * "false"); props.setProperty("ner.applyNumericClassifiers", "false");
-			 * StanfordCoreNLP pipeline = new StanfordCoreNLP(props);
-			 */
+			Properties props = new Properties();
+			props.put("language", "english");
+			props.setProperty("annotators", "tokenize, ssplit, pos, lemma, ner");
+			props.setProperty("ner.useSUTime", "false");
+			props.setProperty("ner.applyNumericClassifiers", "false");
+			StanfordCoreNLP pipeline = new StanfordCoreNLP(props);
 
 			while (f.hasNext()) {
 				String text = ("WARC/1.0" + f.next()).trim();
@@ -146,26 +144,24 @@ public class SparkScript {
 					if (countTokensSentence.length() > 100) {
 						continue;
 					} 
+					clearedText += (sentence.toString()+"\n");
+				}
+				Annotation documentSentencesTokens = new Annotation(clearedText);
+				pipeline.annotate(documentSentencesTokens);
+				coreMapSentences = documentSentencesTokens.get(SentencesAnnotation.class);
+				for (CoreMap sentence : coreMapSentences) {
 					List<CoreLabel> tokens = sentence.get(TokensAnnotation.class);
 					for (CoreLabel t : tokens) {
-						clearedText += " "+t.originalText();
-					} 
+						if (!t.ner().equals("O") && !t.ner().equals("TIME") && !t.ner().equals("DATE")
+								&& !t.ner().equals("NUMBER")) {
+							Token tempToken = new Token(t.originalText(), t.ner(), t.lemma());
+							tokensList.add(tempToken);
+						}
+					}
 				}
-						// Get the tokens
-//					List<CoreLabel> tokens = sentence.get(TokensAnnotation.class);
-//					for (CoreLabel t : tokens) {
-//						if (!t.ner().equals("O") && !t.ner().equals("TIME") && !t.ner().equals("DATE")
-//								&& !t.ner().equals("NUMBER")) {
-//							Token tempToken = new Token(t.originalText(), t.ner(), t.lemma());
-//							tokensList.add(tempToken);
-//						}
-//					}
-//				}
-
 				AnnotatedRecord anRecord = new AnnotatedRecord(recordID, tokensList);
 				output.add(anRecord);
 			}
-
 			return output.iterator();
 		});
 
