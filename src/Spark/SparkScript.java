@@ -70,16 +70,11 @@ public class SparkScript {
 				.map(f -> {
 					String text = ("WARC/1.0" + f.toString()).trim();
 					return text;
-				}).repartition(75);
+				}).repartition(200);
 
 		JavaRDD<AnnotatedRecord> rddWARC = rdd.mapPartitions(f -> {
 			ArrayList<CustomWarcRecord> outputList = new ArrayList<CustomWarcRecord>();
 			ArrayList<AnnotatedRecord> output = new ArrayList<AnnotatedRecord>();
-
-			Properties propsSentence = new Properties();
-			propsSentence.put("language", "english");
-			propsSentence.setProperty("annotators", "tokenize, ssplit");
-			StanfordCoreNLP pipelineSentence = new StanfordCoreNLP(propsSentence);
 
 			Properties props = new Properties();
 			props.put("language", "english");
@@ -132,23 +127,9 @@ public class SparkScript {
 				ArrayList<Token> tokensList = new ArrayList<Token>();
 				
 				
-				Annotation documentSentences = new Annotation(parsedContent);
-				pipelineSentence.annotate(documentSentences);
-				List<CoreMap> coreMapSentences = documentSentences.get(SentencesAnnotation.class);
-				String clearedText = "";
-				
-				for (CoreMap sentence : coreMapSentences) {
-					edu.stanford.nlp.simple.Sentence countTokensSentence = new edu.stanford.nlp.simple.Sentence(
-							sentence);
-//					 IF SENTENCE HAS MORE THAN 100 TOKENS, DO NOT PROCESS IT!
-					if (countTokensSentence.length() > 100) {
-						continue;
-					} 
-					clearedText += (sentence.toString()+"\n");
-				}
-				Annotation documentSentencesTokens = new Annotation(clearedText);
+				Annotation documentSentencesTokens = new Annotation(record.getContent());
 				pipeline.annotate(documentSentencesTokens);
-				coreMapSentences = documentSentencesTokens.get(SentencesAnnotation.class);
+				List<CoreMap>coreMapSentences = documentSentencesTokens.get(SentencesAnnotation.class);
 				for (CoreMap sentence : coreMapSentences) {
 					List<CoreLabel> tokens = sentence.get(TokensAnnotation.class);
 					for (CoreLabel t : tokens) {
