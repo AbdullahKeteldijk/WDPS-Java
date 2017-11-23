@@ -124,11 +124,10 @@ public class SparkScript {
 					
 					for(CustomWarcRecord record: outputList){
 						String recordID = record.getRecordID();
-						String parsedContent = "";
 						ArrayList<Token> tokensList = new ArrayList<Token>();
-						/*
-						String parsedContent = Jsoup.parse(record.getContent()).text();
 						
+						String parsedContent = Jsoup.parse(record.getContent()).text();
+						/*
 						Annotation documentSentences = new Annotation(parsedContent);
 						pipeline.annotate(documentSentences);
 						List<CoreMap> coreMapSentences = documentSentences.get(SentencesAnnotation.class);
