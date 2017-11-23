@@ -68,7 +68,7 @@ public class SparkScript {
 				.newAPIHadoopFile(inputdir, TextInputFormat.class, LongWritable.class, Text.class, hadoopConf).values().map(f->{
 					String text = ("WARC/1.0" + f.toString()).trim();
 					return text;
-				}).repartition(100);
+				}).repartition(50);
 		
 		
 		JavaRDD<CustomWarcRecord> rddWARC = rdd
@@ -153,7 +153,7 @@ public class SparkScript {
 					edu.stanford.nlp.simple.Sentence countTokensSentence = new edu.stanford.nlp.simple.Sentence(
 							sentence);
 					// IF SENTENCE HAS MORE THAN 100 TOKENS, DO NOT PROCESS IT!
-					if (countTokensSentence.length() > 100) {
+					if (countTokensSentence.length() > 50) {
 						logger.info("Sentence out");
 						continue;
 					}
@@ -181,6 +181,8 @@ public class SparkScript {
 			return output.iterator();
 		});
 
+		outputRDD.cache();
+		System.out.println(outputRDD.count());
 		System.out.println(outputRDD.collect());
 
 	}
