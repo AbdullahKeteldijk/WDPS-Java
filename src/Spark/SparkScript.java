@@ -111,7 +111,7 @@ public class SparkScript {
 						is.close();
 					}
 					return outputList.iterator();
-				}).repartition(24);
+				});
 
 		/// home/kevin/Documents/WDPS/wdps2017/CommonCrawl-sample.warc.gz
 		// hdfs:///user/bbkruit/CC-MAIN-20160924173739-00000-ip-10-143-35-109.ec2.internal.warc.gz
