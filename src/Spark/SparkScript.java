@@ -76,12 +76,10 @@ public class SparkScript {
 			ArrayList<CustomWarcRecord> outputList = new ArrayList<CustomWarcRecord>();
 			ArrayList<AnnotatedRecord> output = new ArrayList<AnnotatedRecord>();
 
-//			Properties propsSentence = new Properties();
-
-//			propsSentence.put("language", "english");
-//			propsSentence.setProperty("annotators", "tokenize, ssplit");
-
-//			StanfordCoreNLP pipelineSentence = new StanfordCoreNLP(propsSentence);
+			Properties propsSentence = new Properties();
+			propsSentence.put("language", "english");
+			propsSentence.setProperty("annotators", "tokenize, ssplit");
+			StanfordCoreNLP pipelineSentence = new StanfordCoreNLP(propsSentence);
 
 			/*
 			 * Properties props = new Properties();
@@ -133,19 +131,27 @@ public class SparkScript {
 				String recordID = record.getRecordID();
 				String parsedContent =  record.getContent().toString().replaceAll("\\<.*?>"," ");
 //				String parsedContent = Jsoup.parse(record.getContent()).text();
-
-				Annotation documentSentences = new Annotation(parsedContent);
-//				pipelineSentence.annotate(documentSentences);
-//				List<CoreMap> coreMapSentences = documentSentences.get(SentencesAnnotation.class);
 				ArrayList<Token> tokensList = new ArrayList<Token>();
-
-//				for (CoreMap sentence : coreMapSentences) {
-//					edu.stanford.nlp.simple.Sentence countTokensSentence = new edu.stanford.nlp.simple.Sentence(
-//							sentence);
-//					// IF SENTENCE HAS MORE THAN 100 TOKENS, DO NOT PROCESS IT!
-//					if (countTokensSentence.length() > 200) {
-//						continue;
-//					} // Get the tokens
+				
+				
+				Annotation documentSentences = new Annotation(parsedContent);
+				pipelineSentence.annotate(documentSentences);
+				List<CoreMap> coreMapSentences = documentSentences.get(SentencesAnnotation.class);
+				String clearedText = "";
+				
+				for (CoreMap sentence : coreMapSentences) {
+					edu.stanford.nlp.simple.Sentence countTokensSentence = new edu.stanford.nlp.simple.Sentence(
+							sentence);
+//					 IF SENTENCE HAS MORE THAN 100 TOKENS, DO NOT PROCESS IT!
+					if (countTokensSentence.length() > 100) {
+						continue;
+					} 
+					List<CoreLabel> tokens = sentence.get(TokensAnnotation.class);
+					for (CoreLabel t : tokens) {
+						clearedText += " "+t.originalText();
+					} 
+				}
+						// Get the tokens
 //					List<CoreLabel> tokens = sentence.get(TokensAnnotation.class);
 //					for (CoreLabel t : tokens) {
 //						if (!t.ner().equals("O") && !t.ner().equals("TIME") && !t.ner().equals("DATE")
