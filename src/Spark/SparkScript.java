@@ -60,102 +60,109 @@ public class SparkScript {
 			conf = new SparkConf().setAppName("Extraction").setMaster("local[3]");// .setJars(jars);
 		else
 			conf = new SparkConf().setAppName("Extraction");
-		
+
 		context = new JavaSparkContext(conf);
 
 		Configuration hadoopConf = new Configuration();
 		hadoopConf.set("textinputformat.record.delimiter", "WARC/1.0");
 		JavaRDD<String> rdd = context
-				.newAPIHadoopFile(inputdir, TextInputFormat.class, LongWritable.class, Text.class, hadoopConf).values().map(f->{
+				.newAPIHadoopFile(inputdir, TextInputFormat.class, LongWritable.class, Text.class, hadoopConf).values()
+				.map(f -> {
 					String text = ("WARC/1.0" + f.toString()).trim();
 					return text;
 				}).repartition(75);
-		
-		
-		JavaRDD<AnnotatedRecord> rddWARC = rdd
-				.mapPartitions(f -> {
-					ArrayList<CustomWarcRecord> outputList = new ArrayList<CustomWarcRecord>();
-					ArrayList<AnnotatedRecord> output = new ArrayList<AnnotatedRecord>();
-					/*Properties props = new Properties();
 
-					props.put("language", "english");
-					props.setProperty("annotators", "tokenize, ssplit, pos, lemma, ner");
-					props.setProperty("ner.useSUTime", "false");
-					props.setProperty("ner.applyNumericClassifiers", "false");
-					StanfordCoreNLP pipeline = new StanfordCoreNLP(props);*/
-					
-					
-					while (f.hasNext()) {
-						String text = ("WARC/1.0" + f.next()).trim();
-						InputStream is = new ByteArrayInputStream(text.getBytes(StandardCharsets.UTF_8.name()));
+		JavaRDD<AnnotatedRecord> rddWARC = rdd.mapPartitions(f -> {
+			ArrayList<CustomWarcRecord> outputList = new ArrayList<CustomWarcRecord>();
+			ArrayList<AnnotatedRecord> output = new ArrayList<AnnotatedRecord>();
 
-						int numRecords = 0;
-						WarcReader reader = WarcReaderFactory.getReader(is);
-						WarcRecord record;
-						while ((record = reader.getNextRecord()) != null) {
-							if ((++numRecords) % 1000 == 0)
-								System.out.println(numRecords);
-							if (record.getHeader("WARC-Record-ID") == null)
-								continue;
-							String recordId = record.getHeader("WARC-Record-ID").value;
-							String contentType = record.getHeader("Content-Type").value;
+//			Properties propsSentence = new Properties();
 
-							if (!contentType.equals("application/http; msgtype=response"))
-								continue;
-							BufferedReader br = null;
-							StringBuilder sb = new StringBuilder();
+//			propsSentence.put("language", "english");
+//			propsSentence.setProperty("annotators", "tokenize, ssplit");
 
-							String line;
-							try {
-								br = new BufferedReader(new InputStreamReader(record.getPayload().getInputStream()));
-								while ((line = br.readLine()) != null) {
-									sb.append(line);
-								}
-								CustomWarcRecord temp = new CustomWarcRecord(recordId, sb.toString());
-								outputList.add(temp);
-							} catch (Exception e) {
-								e.printStackTrace();
-							}
-							
+//			StanfordCoreNLP pipelineSentence = new StanfordCoreNLP(propsSentence);
+
+			/*
+			 * Properties props = new Properties();
+			 * 
+			 * props.put("language", "english"); props.setProperty("annotators",
+			 * "tokenize, ssplit, pos, lemma, ner"); props.setProperty("ner.useSUTime",
+			 * "false"); props.setProperty("ner.applyNumericClassifiers", "false");
+			 * StanfordCoreNLP pipeline = new StanfordCoreNLP(props);
+			 */
+
+			while (f.hasNext()) {
+				String text = ("WARC/1.0" + f.next()).trim();
+				InputStream is = new ByteArrayInputStream(text.getBytes(StandardCharsets.UTF_8.name()));
+
+				int numRecords = 0;
+				WarcReader reader = WarcReaderFactory.getReader(is);
+				WarcRecord record;
+				while ((record = reader.getNextRecord()) != null) {
+					if ((++numRecords) % 1000 == 0)
+						System.out.println(numRecords);
+					if (record.getHeader("WARC-Record-ID") == null)
+						continue;
+					String recordId = record.getHeader("WARC-Record-ID").value;
+					String contentType = record.getHeader("Content-Type").value;
+
+					if (!contentType.equals("application/http; msgtype=response"))
+						continue;
+					BufferedReader br = null;
+					StringBuilder sb = new StringBuilder();
+
+					String line;
+					try {
+						br = new BufferedReader(new InputStreamReader(record.getPayload().getInputStream()));
+						while ((line = br.readLine()) != null) {
+							sb.append(line);
 						}
-						reader.close();
-						is.close();
+						CustomWarcRecord temp = new CustomWarcRecord(recordId, sb.toString());
+						outputList.add(temp);
+					} catch (Exception e) {
+						e.printStackTrace();
 					}
-					
-					for(CustomWarcRecord record: outputList){
-						String recordID = record.getRecordID();
-						ArrayList<Token> tokensList = new ArrayList<Token>();
-						
-						String parsedContent = Jsoup.parse(record.getContent()).text();
-						/*
-						Annotation documentSentences = new Annotation(parsedContent);
-						pipeline.annotate(documentSentences);
-						List<CoreMap> coreMapSentences = documentSentences.get(SentencesAnnotation.class);
-						ArrayList<Token> tokensList = new ArrayList<Token>();
-						for (CoreMap sentence : coreMapSentences) {
-							
-							edu.stanford.nlp.simple.Sentence countTokensSentence = new edu.stanford.nlp.simple.Sentence(
-									sentence);
-							// IF SENTENCE HAS MORE THAN 100 TOKENS, DO NOT PROCESS IT!
-							if (countTokensSentence.length() > 200) {
-								continue;
-							}
-							// Get the tokens
-							List<CoreLabel> tokens = sentence.get(TokensAnnotation.class);
-							for (CoreLabel t : tokens) {
-								if (!t.ner().equals("O") && !t.ner().equals("TIME") && !t.ner().equals("DATE")
-										&& !t.ner().equals("NUMBER")) {
-									Token tempToken = new Token(t.originalText(), t.ner(), t.lemma());
-									tokensList.add(tempToken);
-								}
-							}
-						}*/
-						AnnotatedRecord anRecord = new AnnotatedRecord(recordID, tokensList);
-						output.add(anRecord);
-					}
-					
-					return output.iterator();
-				});
+
+				}
+				reader.close();
+				is.close();
+			}
+
+			for (CustomWarcRecord record : outputList) {
+				String recordID = record.getRecordID();
+				String parsedContent =  record.getContent().toString().replaceAll("\\<.*?>"," ");
+				System.out.println(parsedContent);
+//				String parsedContent = Jsoup.parse(record.getContent()).text();
+
+				Annotation documentSentences = new Annotation(parsedContent);
+//				pipelineSentence.annotate(documentSentences);
+//				List<CoreMap> coreMapSentences = documentSentences.get(SentencesAnnotation.class);
+				ArrayList<Token> tokensList = new ArrayList<Token>();
+
+//				for (CoreMap sentence : coreMapSentences) {
+//					edu.stanford.nlp.simple.Sentence countTokensSentence = new edu.stanford.nlp.simple.Sentence(
+//							sentence);
+//					// IF SENTENCE HAS MORE THAN 100 TOKENS, DO NOT PROCESS IT!
+//					if (countTokensSentence.length() > 200) {
+//						continue;
+//					} // Get the tokens
+//					List<CoreLabel> tokens = sentence.get(TokensAnnotation.class);
+//					for (CoreLabel t : tokens) {
+//						if (!t.ner().equals("O") && !t.ner().equals("TIME") && !t.ner().equals("DATE")
+//								&& !t.ner().equals("NUMBER")) {
+//							Token tempToken = new Token(t.originalText(), t.ner(), t.lemma());
+//							tokensList.add(tempToken);
+//						}
+//					}
+//				}
+
+				AnnotatedRecord anRecord = new AnnotatedRecord(recordID, tokensList);
+				output.add(anRecord);
+			}
+
+			return output.iterator();
+		});
 
 		/// home/kevin/Documents/WDPS/wdps2017/CommonCrawl-sample.warc.gz
 		// hdfs:///user/bbkruit/CC-MAIN-20160924173739-00000-ip-10-143-35-109.ec2.internal.warc.gz
@@ -171,6 +178,5 @@ public class SparkScript {
 		System.out.println(outputRDD.collect());
 
 	}
-
 
 }
