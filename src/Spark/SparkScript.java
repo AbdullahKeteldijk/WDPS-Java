@@ -70,7 +70,7 @@ public class SparkScript {
 				.map(f -> {
 					String text = ("WARC/1.0" + f.toString()).trim();
 					return text;
-				}).repartition(200);
+				}).repartition(75);
 
 		JavaRDD<AnnotatedRecord> rddWARC = rdd.mapPartitions(f -> {
 			ArrayList<CustomWarcRecord> outputList = new ArrayList<CustomWarcRecord>();
