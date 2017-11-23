@@ -69,21 +69,20 @@ public class SparkScript {
 				.newAPIHadoopFile(inputdir, TextInputFormat.class, LongWritable.class, Text.class, hadoopConf).values().map(f->{
 					String text = ("WARC/1.0" + f.toString()).trim();
 					return text;
-				}).repartition(100);
+				}).repartition(75);
 		
 		
 		JavaRDD<AnnotatedRecord> rddWARC = rdd
 				.mapPartitions(f -> {
 					ArrayList<CustomWarcRecord> outputList = new ArrayList<CustomWarcRecord>();
 					ArrayList<AnnotatedRecord> output = new ArrayList<AnnotatedRecord>();
-					Properties props = new Properties();
+					/*Properties props = new Properties();
 
 					props.put("language", "english");
 					props.setProperty("annotators", "tokenize, ssplit, pos, lemma, ner");
 					props.setProperty("ner.useSUTime", "false");
 					props.setProperty("ner.applyNumericClassifiers", "false");
-					StanfordCoreNLP pipeline = new StanfordCoreNLP(props);
-					System.out.println("Created Pipeline");
+					StanfordCoreNLP pipeline = new StanfordCoreNLP(props);*/
 					
 					
 					while (f.hasNext()) {
@@ -125,7 +124,9 @@ public class SparkScript {
 					
 					for(CustomWarcRecord record: outputList){
 						String recordID = record.getRecordID();
-						
+						String parsedContent = "";
+						ArrayList<Token> tokensList = new ArrayList<Token>();
+						/*
 						String parsedContent = Jsoup.parse(record.getContent()).text();
 						
 						Annotation documentSentences = new Annotation(parsedContent);
@@ -149,7 +150,7 @@ public class SparkScript {
 									tokensList.add(tempToken);
 								}
 							}
-						}
+						}*/
 						AnnotatedRecord anRecord = new AnnotatedRecord(recordID, tokensList);
 						output.add(anRecord);
 					}
