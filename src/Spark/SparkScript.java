@@ -69,7 +69,7 @@ public class SparkScript {
 				.newAPIHadoopFile(inputdir, TextInputFormat.class, LongWritable.class, Text.class, hadoopConf).values().map(f->{
 					String text = ("WARC/1.0" + f.toString()).trim();
 					return text;
-				}).repartition(500);
+				}).repartition(100);
 		
 		
 		JavaRDD<AnnotatedRecord> rddWARC = rdd
