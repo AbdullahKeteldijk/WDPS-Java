@@ -132,7 +132,6 @@ public class SparkScript {
 			for (CustomWarcRecord record : outputList) {
 				String recordID = record.getRecordID();
 				String parsedContent =  record.getContent().toString().replaceAll("\\<.*?>"," ");
-				System.out.println(parsedContent);
 //				String parsedContent = Jsoup.parse(record.getContent()).text();
 
 				Annotation documentSentences = new Annotation(parsedContent);
