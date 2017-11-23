@@ -30,6 +30,7 @@ import edu.stanford.nlp.ling.CoreLabel;
 import edu.stanford.nlp.pipeline.Annotation;
 import edu.stanford.nlp.pipeline.StanfordCoreNLP;
 import edu.stanford.nlp.util.CoreMap;
+import scala.collection.Iterator;
 
 public class SparkScript {
 	private static JavaSparkContext context;
@@ -71,15 +72,25 @@ public class SparkScript {
 				}).repartition(500);
 		
 		
-		JavaRDD<CustomWarcRecord> rddWARC = rdd
+		JavaRDD<AnnotatedRecord> rddWARC = rdd
 				.mapPartitions(f -> {
 					ArrayList<CustomWarcRecord> outputList = new ArrayList<CustomWarcRecord>();
+					ArrayList<AnnotatedRecord> output = new ArrayList<AnnotatedRecord>();
+					Properties props = new Properties();
+
+					props.put("language", "english");
+					props.setProperty("annotators", "tokenize, ssplit, pos, lemma, ner");
+					props.setProperty("ner.useSUTime", "false");
+					props.setProperty("ner.applyNumericClassifiers", "false");
+					StanfordCoreNLP pipeline = new StanfordCoreNLP(props);
+					System.out.println("Created Pipeline");
+					
+					
 					while (f.hasNext()) {
 						String text = ("WARC/1.0" + f.next()).trim();
 						InputStream is = new ByteArrayInputStream(text.getBytes(StandardCharsets.UTF_8.name()));
 
 						int numRecords = 0;
-						int errors = 0;
 						WarcReader reader = WarcReaderFactory.getReader(is);
 						WarcRecord record;
 						while ((record = reader.getNextRecord()) != null) {
@@ -111,75 +122,45 @@ public class SparkScript {
 						reader.close();
 						is.close();
 					}
-					return outputList.iterator();
+					
+					for(CustomWarcRecord record: outputList){
+						String recordID = record.getRecordID();
+						
+						String parsedContent = Jsoup.parse(record.getContent()).text();
+						
+						Annotation documentSentences = new Annotation(parsedContent);
+						pipeline.annotate(documentSentences);
+						List<CoreMap> coreMapSentences = documentSentences.get(SentencesAnnotation.class);
+						ArrayList<Token> tokensList = new ArrayList<Token>();
+						for (CoreMap sentence : coreMapSentences) {
+							
+							edu.stanford.nlp.simple.Sentence countTokensSentence = new edu.stanford.nlp.simple.Sentence(
+									sentence);
+							// IF SENTENCE HAS MORE THAN 100 TOKENS, DO NOT PROCESS IT!
+							if (countTokensSentence.length() > 200) {
+								continue;
+							}
+							// Get the tokens
+							List<CoreLabel> tokens = sentence.get(TokensAnnotation.class);
+							for (CoreLabel t : tokens) {
+								if (!t.ner().equals("O") && !t.ner().equals("TIME") && !t.ner().equals("DATE")
+										&& !t.ner().equals("NUMBER")) {
+									Token tempToken = new Token(t.originalText(), t.ner(), t.lemma());
+									tokensList.add(tempToken);
+								}
+							}
+						}
+						AnnotatedRecord anRecord = new AnnotatedRecord(recordID, tokensList);
+						output.add(anRecord);
+					}
+					
+					return output.iterator();
 				});
 
 		/// home/kevin/Documents/WDPS/wdps2017/CommonCrawl-sample.warc.gz
 		// hdfs:///user/bbkruit/CC-MAIN-20160924173739-00000-ip-10-143-35-109.ec2.internal.warc.gz
 
-		JavaRDD<AnnotatedRecord> annotatedRDD = rddWARC.mapPartitions(recordList -> {
-			ArrayList<AnnotatedRecord> output = new ArrayList<AnnotatedRecord>();
-			Properties props = new Properties();
-
-			props.put("language", "english");
-			props.setProperty("annotators", "tokenize, ssplit, pos, lemma, ner");
-			props.put("depparse.model", "edu/stanford/nlp/models/parser/nndep/english_SD.gz");
-			props.put("parse.originalDependencies", true);
-			props.setProperty("ner.useSUTime", "false");
-			props.setProperty("ner.applyNumericClassifiers", "false");
-			props.setProperty("coref.algorithm", "statistical");
-			props.setProperty("coref.maxMentionDistance", "30"); // default = 50
-			props.setProperty("coref.maxMentionDistanceWithStringMatch", "250"); // default = 500
-			// Probably not needed, since we don't train a new model.
-			// But if, for some reason, a new model is trained this will reduce the memory
-			// load in the training
-			props.setProperty("coref.statistical.maxTrainExamplesPerDocument", "1100"); // Use this to downsample examples
-																						// from larger documents. A value
-																						// larger than 1000 is recommended.
-			props.setProperty("coref.statistical.minClassImbalance", "0.04"); // A value less than 0.05 is recommended.
-
-			StanfordCoreNLP pipeline = new StanfordCoreNLP(props);
-			
-			while (recordList.hasNext()) {
-				CustomWarcRecord record = recordList.next();
-				String recordID = record.getRecordID();
-				
-				String parsedContent = Jsoup.parse(record.getContent()).text();
-				System.out.println(parsedContent);
-				System.out.println(record.getContent());
-				
-				Annotation documentSentences = new Annotation(parsedContent);
-				pipeline.annotate(documentSentences);
-				System.out.println(recordID);
-				List<CoreMap> coreMapSentences = documentSentences.get(SentencesAnnotation.class);
-				ArrayList<Token> tokensList = new ArrayList<Token>();
-				for (CoreMap sentence : coreMapSentences) {
-					
-					edu.stanford.nlp.simple.Sentence countTokensSentence = new edu.stanford.nlp.simple.Sentence(
-							sentence);
-					// IF SENTENCE HAS MORE THAN 100 TOKENS, DO NOT PROCESS IT!
-					System.out.println(countTokensSentence.length());
-					if (countTokensSentence.length() > 200) {
-						logger.info("Sentence out");
-						continue;
-					}
-					// Get the tokens
-					List<CoreLabel> tokens = sentence.get(TokensAnnotation.class);
-					for (CoreLabel t : tokens) {
-						if (!t.ner().equals("O") && !t.ner().equals("TIME") && !t.ner().equals("DATE")
-								&& !t.ner().equals("NUMBER")) {
-							Token tempToken = new Token(t.originalText(), t.ner(), t.lemma());
-							tokensList.add(tempToken);
-						}
-					}
-				}
-				AnnotatedRecord anRecord = new AnnotatedRecord(recordID, tokensList);
-				output.add(anRecord);
-			}
-			return output.iterator();
-		});
-
-		JavaRDD<String> outputRDD = annotatedRDD.flatMap(record -> {
+		JavaRDD<String> outputRDD = rddWARC.flatMap(record -> {
 			ArrayList<String> output = new ArrayList<String>();
 			for (Token t : record.getTokens()) {
 				output.add("" + record.getRecordID() + "\t" + t.getText() + "\t" + t.getNer() + "\n");
@@ -191,28 +172,5 @@ public class SparkScript {
 
 	}
 
-	public static StanfordCoreNLP StanfordDepNNParser() {
-		Properties props = new Properties();
-
-		props.put("language", "english");
-		props.setProperty("annotators", "tokenize, ssplit, pos, lemma, ner");
-		props.put("depparse.model", "edu/stanford/nlp/models/parser/nndep/english_SD.gz");
-		props.put("parse.originalDependencies", true);
-		props.setProperty("ner.useSUTime", "false");
-		props.setProperty("ner.applyNumericClassifiers", "false");
-		props.setProperty("coref.algorithm", "statistical");
-		props.setProperty("coref.maxMentionDistance", "30"); // default = 50
-		props.setProperty("coref.maxMentionDistanceWithStringMatch", "250"); // default = 500
-		// Probably not needed, since we don't train a new model.
-		// But if, for some reason, a new model is trained this will reduce the memory
-		// load in the training
-		props.setProperty("coref.statistical.maxTrainExamplesPerDocument", "1100"); // Use this to downsample examples
-																					// from larger documents. A value
-																					// larger than 1000 is recommended.
-		props.setProperty("coref.statistical.minClassImbalance", "0.04"); // A value less than 0.05 is recommended.
-
-		StanfordCoreNLP pipeline = new StanfordCoreNLP(props);
-		return pipeline;
-	}
 
 }
