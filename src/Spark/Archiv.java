@@ -119,10 +119,6 @@ public class Archiv {
 				}).repartition(75);
 		
 		
-		//DEB
-		rdd = context.parallelize(rdd.take(10));
-		
-
 		JavaRDD<Tuple2<String, Tuple2<String, String>>> outputRDD = rdd.mapPartitions(tuples -> {
 			Properties props = new Properties();
 			props.put("language", "english");
@@ -183,7 +179,7 @@ public class Archiv {
 
 		
 		
-		System.out.println(outputRDD.count());
+		System.out.println(outputRDD.collect());
 
 	}
 }
