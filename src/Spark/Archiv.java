@@ -4,6 +4,7 @@ import java.io.BufferedReader;
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
@@ -20,6 +21,8 @@ import org.apache.log4j.Logger;
 import org.apache.spark.SparkConf;
 import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.JavaSparkContext;
+import org.json.JSONArray;
+import org.json.JSONObject;
 import org.jwat.warc.WarcReader;
 import org.jwat.warc.WarcReaderFactory;
 import org.jwat.warc.WarcRecord;
@@ -136,11 +139,39 @@ public class Archiv {
 					for (CoreLabel t : tokens) {
 						if (!t.ner().equals("O") && !t.ner().equals("TIME") && !t.ner().equals("DATE")
 								&& !t.ner().equals("NUMBER")) {
-							output.add(new Tuple2<String, Tuple2<String, String>>(tuple._1,
-									new Tuple2<String, String>(t.originalText(), t.ner())));
+							String searchTerm = t.originalText();
+							URL url = new URL("http://10.149.0.127:9200/freebase/label/_search?q=" + searchTerm);
+							String response = "";
+							boolean foundEntry = false;
+							String freebaseID = "";
+							String name = "";
+							try (BufferedReader reader = new BufferedReader(new InputStreamReader(url.openStream(), "UTF-8"))) {
+								for (String respline; (respline = reader.readLine()) != null;) {
+									response += respline;
+								}
+								
+								JSONObject json = new JSONObject(response);
+								JSONObject hitsObj = json.getJSONObject("hits");
+								JSONArray hitsArr = hitsObj.getJSONArray("hits");
+								JSONObject first = hitsArr.getJSONObject(0);
+								JSONObject source = first.getJSONObject("_source");
+
+								freebaseID = source.getString("resource");
+								name = source.getString("label");
+								foundEntry = true;
+							}catch (Exception e) {
+								foundEntry = false;
+							}
+							if(foundEntry)
+								output.add(new Tuple2<String, Tuple2<String, String>>(tuple._1,
+										new Tuple2<String, String>(t.originalText(), t.ner())));
+							else 
+								continue;
+							
 						}
 					}
 				}
+
 			}
 			return output.iterator();
 		});
