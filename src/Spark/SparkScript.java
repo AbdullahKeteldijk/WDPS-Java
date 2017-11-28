@@ -141,7 +141,7 @@ public class SparkScript {
 					edu.stanford.nlp.simple.Sentence countTokensSentence = new edu.stanford.nlp.simple.Sentence(
 							sentence);
 //					 IF SENTENCE HAS MORE THAN 100 TOKENS, DO NOT PROCESS IT!
-					if (countTokensSentence.length() > 100) {
+					if (countTokensSentence.length() > 50) {
 						continue;
 					} 
 					clearedText += (sentence.toString()+"\n");
