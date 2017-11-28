@@ -131,17 +131,13 @@ public class SparkScript {
 				ArrayList<Token> tokensList = new ArrayList<Token>();
 				
 				ArrayList<String> splitbyLine = new ArrayList<String>();
-				int maxLenght = 10000;
+				int maxLenght = 1000;
 				Pattern p = Pattern.compile("\\G\\s*(.{1,"+maxLenght+"})(?=\\s|$)", Pattern.DOTALL);
 				Matcher m = p.matcher(parsedContent);
 				while (m.find())
 				    splitbyLine.add((m.group(1)));
 
-				
 				for (String line : splitbyLine) {
-					System.out.println("**** "+recordID);
-					System.out.println(line);
-
 					Annotation documentSentencesTokens = new Annotation(line);
 					pipeline.annotate(documentSentencesTokens);
 					List<CoreMap>coreMapSentences = documentSentencesTokens.get(SentencesAnnotation.class);
