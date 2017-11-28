@@ -165,7 +165,7 @@ public class Archiv {
 							}
 							if(foundEntry)
 								output.add(new Tuple2<String, Tuple2<String, String>>(tuple._1,
-										new Tuple2<String, String>(t.originalText(), t.ner())));
+										new Tuple2<String, String>(t.originalText(), freebaseID)));
 							else 
 								continue;
 							
