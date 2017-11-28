@@ -6,10 +6,6 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.List;
-import java.util.Properties;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.LongWritable;
@@ -23,14 +19,6 @@ import org.apache.spark.api.java.JavaSparkContext;
 import org.jwat.warc.WarcReader;
 import org.jwat.warc.WarcReaderFactory;
 import org.jwat.warc.WarcRecord;
-
-import edu.stanford.nlp.ling.CoreLabel;
-import edu.stanford.nlp.ling.CoreAnnotations.SentencesAnnotation;
-import edu.stanford.nlp.ling.CoreAnnotations.TokensAnnotation;
-import edu.stanford.nlp.pipeline.Annotation;
-import edu.stanford.nlp.pipeline.StanfordCoreNLP;
-import edu.stanford.nlp.util.CoreMap;
-import net.htmlparser.jericho.Source;
 
 public class Archiv {
 	private static JavaSparkContext context;
@@ -65,11 +53,41 @@ public class Archiv {
 
 		Configuration hadoopConf = new Configuration();
 		hadoopConf.set("textinputformat.record.delimiter", "WARC/1.0");
-		JavaRDD<String> rdd = context
+		JavaRDD<CustomWarcRecord> rdd = context
 				.newAPIHadoopFile(inputdir, TextInputFormat.class, LongWritable.class, Text.class, hadoopConf).values()
-				.map(f -> {
+				.flatMap(f -> {
 					String text = ("WARC/1.0" + f.toString()).trim();
-					return text;
+					ArrayList<CustomWarcRecord> outputList = new ArrayList<CustomWarcRecord>();
+					InputStream is = new ByteArrayInputStream(text.getBytes(StandardCharsets.UTF_8.name()));
+					WarcReader reader = WarcReaderFactory.getReader(is);
+					WarcRecord record;
+					while ((record = reader.getNextRecord()) != null) {
+						if (record.getHeader("WARC-Record-ID") == null)
+							continue;
+						String recordId = record.getHeader("WARC-Record-ID").value;
+						String contentType = record.getHeader("Content-Type").value;
+
+						if (!contentType.equals("application/http; msgtype=response"))
+							continue;
+						BufferedReader br = null;
+						StringBuilder sb = new StringBuilder();
+
+						String line;
+						try {
+							br = new BufferedReader(new InputStreamReader(record.getPayload().getInputStream()));
+							while ((line = br.readLine()) != null) {
+								sb.append(line);
+							}
+							CustomWarcRecord temp = new CustomWarcRecord(recordId, sb.toString());
+							outputList.add(temp);
+						} catch (Exception e) {
+							e.printStackTrace();
+						}
+
+					}
+					reader.close();
+					is.close();
+					return outputList.iterator();
 				}).repartition(75);
 
 
