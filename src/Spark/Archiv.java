@@ -6,6 +6,8 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.List;
+import java.util.Properties;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -22,6 +24,12 @@ import org.jwat.warc.WarcReader;
 import org.jwat.warc.WarcReaderFactory;
 import org.jwat.warc.WarcRecord;
 
+import edu.stanford.nlp.ling.CoreLabel;
+import edu.stanford.nlp.ling.CoreAnnotations.SentencesAnnotation;
+import edu.stanford.nlp.ling.CoreAnnotations.TokensAnnotation;
+import edu.stanford.nlp.pipeline.Annotation;
+import edu.stanford.nlp.pipeline.StanfordCoreNLP;
+import edu.stanford.nlp.util.CoreMap;
 import net.htmlparser.jericho.Source;
 import scala.Tuple2;
 
@@ -106,8 +114,37 @@ public class Archiv {
 						splitbyLine.add(new Tuple2<String, String>(recordID, m.group(1)));
 					return splitbyLine.iterator();
 				}).repartition(75);
+		
+		JavaRDD<Tuple2<String, Tuple2<String, String>>> outputRDD = rdd.mapPartitions(tuples->{
+			Properties props = new Properties();
+			props.put("language", "english");
+			props.setProperty("annotators", "tokenize, ssplit, pos, lemma, ner");
+			props.setProperty("ner.useSUTime", "false");
+			props.setProperty("ner.applyNumericClassifiers", "false");
+			
+			ArrayList<Tuple2<String, Tuple2<String, String>>> output = new ArrayList<Tuple2<String, Tuple2<String, String>>>();
+			
+			StanfordCoreNLP pipeline = new StanfordCoreNLP(props);
+			while (tuples.hasNext()) {
+				Tuple2<String, String> tuple = tuples.next();
+				String line = tuple._2;
+				Annotation documentSentencesTokens = new Annotation(line);
+				pipeline.annotate(documentSentencesTokens);
+				List<CoreMap>coreMapSentences = documentSentencesTokens.get(SentencesAnnotation.class);
+				for (CoreMap sentence : coreMapSentences) {
+					List<CoreLabel> tokens = sentence.get(TokensAnnotation.class);
+					for (CoreLabel t : tokens) {
+						if (!t.ner().equals("O") && !t.ner().equals("TIME") && !t.ner().equals("DATE")
+								&& !t.ner().equals("NUMBER")) {
+							output.add(new Tuple2<String, Tuple2<String, String>>(tuple._1,new Tuple2<String,String>(t.originalText(),t.ner())));
+						}
+					}
+				}
+			}
+			return output.iterator();
+		});
 
-		System.out.println(rdd.count());
+		System.out.println(outputRDD.count());
 
 	}
 }
