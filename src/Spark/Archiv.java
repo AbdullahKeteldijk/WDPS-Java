@@ -117,6 +117,11 @@ public class Archiv {
 						splitbyLine.add(new Tuple2<String, String>(recordID, m.group(1)));
 					return splitbyLine.iterator();
 				}).repartition(75);
+		
+		
+		//DEB
+		rdd = context.parallelize(rdd.take(10));
+		
 
 		JavaRDD<Tuple2<String, Tuple2<String, String>>> outputRDD = rdd.mapPartitions(tuples -> {
 			Properties props = new Properties();
@@ -176,6 +181,8 @@ public class Archiv {
 			return output.iterator();
 		});
 
+		
+		
 		System.out.println(outputRDD.count());
 
 	}
