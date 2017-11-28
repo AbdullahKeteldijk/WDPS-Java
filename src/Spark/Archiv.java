@@ -114,29 +114,30 @@ public class Archiv {
 						splitbyLine.add(new Tuple2<String, String>(recordID, m.group(1)));
 					return splitbyLine.iterator();
 				}).repartition(75);
-		
-		JavaRDD<Tuple2<String, Tuple2<String, String>>> outputRDD = rdd.mapPartitions(tuples->{
+
+		JavaRDD<Tuple2<String, Tuple2<String, String>>> outputRDD = rdd.mapPartitions(tuples -> {
 			Properties props = new Properties();
 			props.put("language", "english");
 			props.setProperty("annotators", "tokenize, ssplit, pos, lemma, ner");
 			props.setProperty("ner.useSUTime", "false");
 			props.setProperty("ner.applyNumericClassifiers", "false");
-			
+
 			ArrayList<Tuple2<String, Tuple2<String, String>>> output = new ArrayList<Tuple2<String, Tuple2<String, String>>>();
-			
+
 			StanfordCoreNLP pipeline = new StanfordCoreNLP(props);
 			while (tuples.hasNext()) {
 				Tuple2<String, String> tuple = tuples.next();
 				String line = tuple._2;
 				Annotation documentSentencesTokens = new Annotation(line);
 				pipeline.annotate(documentSentencesTokens);
-				List<CoreMap>coreMapSentences = documentSentencesTokens.get(SentencesAnnotation.class);
+				List<CoreMap> coreMapSentences = documentSentencesTokens.get(SentencesAnnotation.class);
 				for (CoreMap sentence : coreMapSentences) {
 					List<CoreLabel> tokens = sentence.get(TokensAnnotation.class);
 					for (CoreLabel t : tokens) {
 						if (!t.ner().equals("O") && !t.ner().equals("TIME") && !t.ner().equals("DATE")
 								&& !t.ner().equals("NUMBER")) {
-							output.add(new Tuple2<String, Tuple2<String, String>>(tuple._1,new Tuple2<String,String>(t.originalText(),t.ner())));
+							output.add(new Tuple2<String, Tuple2<String, String>>(tuple._1,
+									new Tuple2<String, String>(t.originalText(), t.ner())));
 						}
 					}
 				}

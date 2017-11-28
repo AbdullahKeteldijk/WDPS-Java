@@ -1,26 +1,45 @@
 package Spark;
 
-import net.htmlparser.jericho.Source;
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.net.InetAddress;
+import java.net.URL;
 
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-
-import org.apache.log4j.LogManager;
+import org.elasticsearch.action.search.SearchResponse;
+import org.elasticsearch.action.search.SearchType;
+import org.elasticsearch.client.Client;
+import org.elasticsearch.client.transport.TransportClient;
+import org.elasticsearch.common.settings.Settings;
+import org.elasticsearch.common.transport.InetSocketTransportAddress;
+import org.elasticsearch.index.query.QueryBuilders;
+import org.elasticsearch.search.SearchHit;
 
 public class test {
 
 
 	
-	public static void main(String[] args) {
-		Source source=new Source("<html>Hello \n World</html>");
-		System.out.println(source.getTextExtractor().setExcludeNonHTMLElements(true).setIncludeAttributes(false).toString());
+	public static void main(String[] args) throws IOException {
+		Settings settings = Settings.settingsBuilder()
+		        .put("cluster.name", "web-data-processing-systems").build();
 		
-		String data = "Hello there, my name is not importnant right now."
-		        + " I am just simple sentecne used to test few things.";
-		int maxLenght = 20;
-		Pattern p = Pattern.compile("\\G\\s*(.{1,"+maxLenght+"})(?=\\s|$)", Pattern.DOTALL);
-		Matcher m = p.matcher(data);
-		while (m.find())
-		    System.out.println(m.group(1));
+		Client client = TransportClient.builder().settings(settings).build()
+		        .addTransportAddress(new InetSocketTransportAddress(InetAddress.getByName("http://10.149.0.127"), 9200));
+
+		// on shutdown
+		
+		
+		SearchResponse response = client.prepareSearch("freebase")
+		        .setTypes("type1", "type2")
+		        .setSearchType(SearchType.DFS_QUERY_THEN_FETCH)
+		        .setQuery(QueryBuilders.termQuery("multi", "obama"))                 // Query
+		        .setFrom(0).setSize(60).setExplain(true)
+		        .execute()
+		        .actionGet();
+		
+		for (SearchHit sh: response.getHits()){
+			System.out.println(sh.toString());
+		}
+		client.close();
 	}
 }

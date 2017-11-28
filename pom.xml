@@ -69,6 +69,12 @@
 		</dependency>
 
 		<dependency>
+			<groupId>org.elasticsearch</groupId>
+			<artifactId>elasticsearch</artifactId>
+			<version>2.4.1</version>
+		</dependency>
+
+		<dependency>
 			<groupId>org.jwat</groupId>
 			<artifactId>jwat-arc</artifactId>
 			<version>1.1.0</version>
