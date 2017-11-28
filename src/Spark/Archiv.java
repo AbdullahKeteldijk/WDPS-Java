@@ -6,6 +6,8 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.LongWritable;
@@ -19,6 +21,9 @@ import org.apache.spark.api.java.JavaSparkContext;
 import org.jwat.warc.WarcReader;
 import org.jwat.warc.WarcReaderFactory;
 import org.jwat.warc.WarcRecord;
+
+import net.htmlparser.jericho.Source;
+import scala.Tuple2;
 
 public class Archiv {
 	private static JavaSparkContext context;
@@ -53,7 +58,7 @@ public class Archiv {
 
 		Configuration hadoopConf = new Configuration();
 		hadoopConf.set("textinputformat.record.delimiter", "WARC/1.0");
-		JavaRDD<CustomWarcRecord> rdd = context
+		JavaRDD<Tuple2<String, String>> rdd = context
 				.newAPIHadoopFile(inputdir, TextInputFormat.class, LongWritable.class, Text.class, hadoopConf).values()
 				.flatMap(f -> {
 					String text = ("WARC/1.0" + f.toString()).trim();
@@ -86,10 +91,21 @@ public class Archiv {
 
 					}
 					reader.close();
+
 					is.close();
 					return outputList.iterator();
+				}).flatMap(record -> {
+					String recordID = record.getRecordID();
+					Source source = new Source(record.getContent().toString());
+					String parsedContent = source.getTextExtractor().setIncludeAttributes(false).toString();
+					ArrayList<Tuple2<String, String>> splitbyLine = new ArrayList<Tuple2<String, String>>();
+					int maxLenght = 10000;
+					Pattern p = Pattern.compile("\\G\\s*(.{1," + maxLenght + "})(?=\\s|$)", Pattern.DOTALL);
+					Matcher m = p.matcher(parsedContent);
+					while (m.find())
+						splitbyLine.add(new Tuple2<String, String>(recordID, m.group(1)));
+					return splitbyLine.iterator();
 				}).repartition(75);
-
 
 		System.out.println(rdd.count());
 
