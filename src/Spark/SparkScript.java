@@ -127,40 +127,42 @@ public class SparkScript {
 
 			for (CustomWarcRecord record : outputList) {
 				String recordID = record.getRecordID();
-				String parsedContent =  record.getContent().toString().replaceAll("\\<.*?>"," ");
-//				String parsedContent = Jsoup.parse(record.getContent()).text();
+				String parsedContent = record.getContent().toString().replaceAll("\\<.*?>", " ");
+				// String parsedContent = Jsoup.parse(record.getContent()).text();
 				ArrayList<Token> tokensList = new ArrayList<Token>();
-				
-				
-				Annotation documentSentences = new Annotation(parsedContent);
-				pipelineSentence.annotate(documentSentences);
-				List<CoreMap> coreMapSentences = documentSentences.get(SentencesAnnotation.class);
-				String clearedText = "";
-				
-				for (CoreMap sentence : coreMapSentences) {
-					edu.stanford.nlp.simple.Sentence countTokensSentence = new edu.stanford.nlp.simple.Sentence(
-							sentence);
-//					 IF SENTENCE HAS MORE THAN 100 TOKENS, DO NOT PROCESS IT!
-					if (countTokensSentence.length() > 50) {
-						continue;
-					} 
-					clearedText += (sentence.toString()+"\n");
-				}
-				Annotation documentSentencesTokens = new Annotation(clearedText);
-				pipeline.annotate(documentSentencesTokens);
-				coreMapSentences = documentSentencesTokens.get(SentencesAnnotation.class);
-				for (CoreMap sentence : coreMapSentences) {
-					List<CoreLabel> tokens = sentence.get(TokensAnnotation.class);
-					for (CoreLabel t : tokens) {
-						if (!t.ner().equals("O") && !t.ner().equals("TIME") && !t.ner().equals("DATE")
-								&& !t.ner().equals("NUMBER")) {
-							Token tempToken = new Token(t.originalText(), t.ner(), t.lemma());
-							tokensList.add(tempToken);
+
+				String[] splitbyLine = parsedContent.split("\n");
+				for (String line : splitbyLine) {
+					Annotation documentSentences = new Annotation(line);
+					pipelineSentence.annotate(documentSentences);
+					List<CoreMap> coreMapSentences = documentSentences.get(SentencesAnnotation.class);
+					String clearedText = "";
+
+					for (CoreMap sentence : coreMapSentences) {
+						edu.stanford.nlp.simple.Sentence countTokensSentence = new edu.stanford.nlp.simple.Sentence(
+								sentence);
+						// IF SENTENCE HAS MORE THAN 50 TOKENS, DO NOT PROCESS IT!
+						if (countTokensSentence.length() > 100) {
+							continue;
+						}
+						clearedText += (sentence.toString() + "\n");
+					}
+					Annotation documentSentencesTokens = new Annotation(clearedText);
+					pipeline.annotate(documentSentencesTokens);
+					coreMapSentences = documentSentencesTokens.get(SentencesAnnotation.class);
+					for (CoreMap sentence : coreMapSentences) {
+						List<CoreLabel> tokens = sentence.get(TokensAnnotation.class);
+						for (CoreLabel t : tokens) {
+							if (!t.ner().equals("O") && !t.ner().equals("TIME") && !t.ner().equals("DATE")
+									&& !t.ner().equals("NUMBER")) {
+								Token tempToken = new Token(t.originalText(), t.ner(), t.lemma());
+								tokensList.add(tempToken);
+							}
 						}
 					}
+					AnnotatedRecord anRecord = new AnnotatedRecord(recordID, tokensList);
+					output.add(anRecord);
 				}
-				AnnotatedRecord anRecord = new AnnotatedRecord(recordID, tokensList);
-				output.add(anRecord);
 			}
 			return output.iterator();
 		});
